@@ -30,6 +30,7 @@ Fix หลัก:
 - โบนัสเมื่อมีเพื่อนบ้านไหม้ ≥2: ลด delay เพิ่มอีก 15%
 """
 
+import os
 import ee
 import numpy as np
 import time
@@ -38,9 +39,10 @@ import math
 import cv2
 import heapq
 from typing import List, Tuple, Dict, Any, Optional
-
+from dotenv import load_dotenv
 # ===== Initialize GEE =====
-PROJECT = "dulcet-opus-464616-k1"
+load_dotenv()
+PROJECT = os.getenv("GEE_PROJECT_ID")
 try:
     ee.Initialize(project=PROJECT)
 except Exception:

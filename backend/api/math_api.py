@@ -1,17 +1,22 @@
 from fastapi import APIRouter, HTTPException
-from services.math_service import optimize_from_store
+from pydantic import BaseModel
+from typing import Dict
+from services.math_service import optimize_from_frontend
 
 router = APIRouter(prefix="/math", tags=["Math Optimization"])
 
 
+class OptimizeRequest(BaseModel):
+    zones: Dict[str, float]  # {"A": 2400, "B": 1800}
+
+
 @router.post("/optimize")
-def optimize_firebreak():
+def optimize_firebreak(payload: OptimizeRequest):
     """
-    เรียก optimization โดยใช้ zones ที่ถูกบันทึกจาก UI (dropdown)
-    - ใช้ Z1, Z2, Weighted Sum เหมือนใน math_model
+    รับ zones จาก frontend โดยตรง
     """
     try:
-        result = optimize_from_store()
+        result = optimize_from_frontend(payload.zones)
         return {
             "status": "success",
             "result": result,
