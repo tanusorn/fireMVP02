@@ -40,14 +40,21 @@ import cv2
 import heapq
 from typing import List, Tuple, Dict, Any, Optional
 from dotenv import load_dotenv
+from google.oauth2 import service_account
+
 # ===== Initialize GEE =====
 load_dotenv()
+
 PROJECT = os.getenv("GEE_PROJECT_ID")
-try:
-    ee.Initialize(project=PROJECT)
-except Exception:
-    ee.Authenticate()
-    ee.Initialize(project=PROJECT)
+CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
+credentials = service_account.Credentials.from_service_account_file(
+    CREDENTIALS_PATH,
+    scopes=["https://www.googleapis.com/auth/earthengine"]
+)
+
+ee.Initialize(credentials, project=PROJECT)
+
 
 # ===== Cell states =====
 UNBURNED = 0

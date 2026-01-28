@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, RequireAuth } from "@/contexts/AuthContext";
+import { AboutProjectDialog } from "@/components/AboutProjectDialog";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Home from "./pages/Home";
@@ -29,6 +30,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <AboutProjectDialog />
       <BrowserRouter>
         <AuthProvider>
           <Routes>
@@ -37,20 +39,118 @@ const App = () => (
             <Route path="/register" element={<Register />} />
 
             {/* Protected routes */}
-            <Route path="/home" element={<RequireAuth><Home /></RequireAuth>} />
-            <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
-            <Route path="/fire-simulation" element={<RequireAuth><FireSimulation /></RequireAuth>} />
-            <Route path="/resources" element={<RequireAuth><Resources /></RequireAuth>} />
-            <Route path="/resource-allocation" element={<RequireAuth><ResourceAllocation /></RequireAuth>} />
-            <Route path="/incidents" element={<RequireAuth><Incidents /></RequireAuth>} />
-            <Route path="/incidents/dashboard" element={<RequireAuth><IncidentsDashboard /></RequireAuth>} />
-            <Route path="/incidents/:id" element={<RequireAuth><IncidentDetail /></RequireAuth>} />
-            <Route path="/operation-centers" element={<RequireAuth><OperationCenters /></RequireAuth>} />
-            <Route path="/operation-centers/:centerId" element={<RequireAuth><OperationCenterDetail /></RequireAuth>} />
-            <Route path="/daily-report" element={<RequireAuth><DailyReport /></RequireAuth>} />
-            <Route path="/simulation-statistics" element={<RequireAuth><SimulationStatistics /></RequireAuth>} />
-            <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
-            <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
+            <Route
+              path="/home"
+              element={
+                <RequireAuth>
+                  <Home />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <RequireAuth>
+                  <Dashboard />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/fire-simulation"
+              element={
+                <RequireAuth>
+                  <FireSimulation />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/resources"
+              element={
+                <RequireAuth>
+                  <Resources />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/resource-allocation"
+              element={
+                <RequireAuth>
+                  <ResourceAllocation />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/incidents"
+              element={
+                <RequireAuth>
+                  <Incidents />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/incidents/dashboard"
+              element={
+                <RequireAuth>
+                  <IncidentsDashboard />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/incidents/:id"
+              element={
+                <RequireAuth>
+                  <IncidentDetail />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/operation-centers"
+              element={
+                <RequireAuth>
+                  <OperationCenters />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/operation-centers/:centerId"
+              element={
+                <RequireAuth>
+                  <OperationCenterDetail />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/daily-report"
+              element={
+                <RequireAuth>
+                  <DailyReport />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/simulation-statistics"
+              element={
+                <RequireAuth>
+                  <SimulationStatistics />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <RequireAuth>
+                  <Settings />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <RequireAuth>
+                  <Notifications />
+                </RequireAuth>
+              }
+            />
 
             {/* Redirects */}
             <Route path="/" element={<Navigate to="/home" replace />} />

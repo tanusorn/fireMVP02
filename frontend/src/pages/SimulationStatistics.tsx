@@ -12,16 +12,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  Download, 
-  BarChart3, 
-  Flame, 
-  Wind, 
+import {
+  Download,
+  BarChart3,
+  Flame,
+  Wind,
   Activity,
   AlertTriangle,
-  TrendingUp
+  TrendingUp,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { formatAreaM2, formatAreaValue } from "@/lib/formatArea";
 
 interface SimulationResult {
   wind_speed?: number;
@@ -36,10 +37,10 @@ interface SimulationResult {
     burned?: { area_m2?: number; cells?: number };
     firebreak?: { area_m2?: number; cells?: number };
   };
-  ros_statistics?: {
-    mean?: number;
-    min?: number;
-    max?: number;
+  ros?: {
+    mean_mps?: number;
+    min_mps?: number;
+    max_mps?: number;
   };
 }
 
@@ -97,7 +98,7 @@ export default function SimulationStatistics() {
         const params = (row.simulation_params || {}) as SimulationParams;
         const result = (row.simulation_result || {}) as SimulationResult;
         const summary = result.summary || {};
-        const ros = result.ros_statistics || {};
+        const ros = result.ros || {};
 
         const grid_x = params.grid_x || result.grid_x || 0;
         const grid_y = params.grid_y || result.grid_y || 0;
@@ -123,10 +124,11 @@ export default function SimulationStatistics() {
           burned_cells,
           burned_area_m2,
           burned_area_ha: burned_area_m2 / 10000,
-          burn_percentage: total_cells > 0 ? (burned_cells / total_cells) * 100 : 0,
-          ros_mean: ros.mean || 0,
-          ros_min: ros.min || 0,
-          ros_max: ros.max || 0,
+          burn_percentage:
+            total_cells > 0 ? (burned_cells / total_cells) * 100 : 0,
+          ros_mean: ros.mean_mps || 0,
+          ros_min: ros.min_mps || 0,
+          ros_max: ros.max_mps || 0,
           created_at: row.created_at || "",
         };
       });
@@ -141,37 +143,38 @@ export default function SimulationStatistics() {
 
   // Dashboard calculations
   const totalSimulations = reports.length;
-  const avgBurnedArea = reports.length > 0 
-    ? reports.reduce((sum, r) => sum + r.burned_area_ha, 0) / reports.length 
-    : 0;
-  const maxROS = reports.length > 0 
-    ? Math.max(...reports.map(r => r.ros_max)) 
-    : 0;
-  const zeroBurnSimulations = reports.filter(r => r.burned_cells === 0).length;
+  const avgBurnedAreaM2 =
+    reports.length > 0
+      ? reports.reduce((sum, r) => sum + r.burned_area_m2, 0) / reports.length
+      : 0;
+  const maxROS =
+    reports.length > 0 ? Math.max(...reports.map((r) => r.ros_max)) : 0;
+  const zeroBurnSimulations = reports.filter(
+    (r) => r.burned_cells === 0,
+  ).length;
 
   function handleExport() {
     if (reports.length === 0) return;
 
-    const exportData = reports.map(r => ({
-      "รหัสรายงาน": r.report_code,
-      "ละติจูด": r.lat.toFixed(6),
-      "ลองจิจูด": r.lon.toFixed(6),
+    const exportData = reports.map((r) => ({
+      รหัสรายงาน: r.report_code,
+      ละติจูด: r.lat.toFixed(6),
+      ลองจิจูด: r.lon.toFixed(6),
       "ความเร็วลม (m/s)": r.wind_speed.toFixed(2),
       "ทิศทางลม (deg)": r.wind_direction.toFixed(1),
       "Grid X": r.grid_x,
       "Grid Y": r.grid_y,
       "ขนาดเซลล์ (m)": r.cell_size,
       "เวลาจำลอง (นาที)": r.sim_minutes,
-      "เซลล์ทั้งหมด": r.total_cells,
-      "เซลล์ที่กำลังไหม้": r.burning_cells,
-      "เซลล์ที่ไหม้แล้ว": r.burned_cells,
-      "พื้นที่ไหม้ (m²)": r.burned_area_m2.toFixed(2),
-      "พื้นที่ไหม้ (ha)": r.burned_area_ha.toFixed(4),
-      "เปอร์เซ็นต์การไหม้": r.burn_percentage.toFixed(2) + "%",
+      เซลล์ทั้งหมด: r.total_cells,
+      เซลล์ที่กำลังไหม้: r.burning_cells,
+      เซลล์ที่ไหม้แล้ว: r.burned_cells,
+      "พื้นที่ไหม้ (ตร.ม.)": formatAreaValue(r.burned_area_m2),
+      เปอร์เซ็นต์การไหม้: r.burn_percentage.toFixed(2) + "%",
       "ROS เฉลี่ย": r.ros_mean.toFixed(4),
       "ROS ต่ำสุด": r.ros_min.toFixed(4),
       "ROS สูงสุด": r.ros_max.toFixed(4),
-      "วันที่สร้าง": new Date(r.created_at).toLocaleString("th-TH"),
+      วันที่สร้าง: new Date(r.created_at).toLocaleString("th-TH"),
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -189,10 +192,12 @@ export default function SimulationStatistics() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">สถิติการจำลอง</h1>
-            <p className="text-muted-foreground">ข้อมูลผลการจำลองไฟจากฐานข้อมูล</p>
+            <p className="text-muted-foreground">
+              ข้อมูลผลการจำลองไฟจากฐานข้อมูล
+            </p>
           </div>
-          <Button 
-            onClick={handleExport} 
+          <Button
+            onClick={handleExport}
             disabled={reports.length === 0}
             className="min-h-[44px]"
           >
@@ -223,8 +228,10 @@ export default function SimulationStatistics() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{avgBurnedArea.toFixed(2)}</p>
-              <p className="text-sm text-muted-foreground">เฮกตาร์</p>
+              <p className="text-3xl font-bold">
+                {formatAreaValue(avgBurnedAreaM2)}
+              </p>
+              <p className="text-sm text-muted-foreground">ตร.ม.</p>
             </CardContent>
           </Card>
 
@@ -286,7 +293,9 @@ export default function SimulationStatistics() {
                       <TableHead className="min-w-[90px]">พิกัด</TableHead>
                       <TableHead className="min-w-[60px]">Grid</TableHead>
                       <TableHead className="min-w-[70px]">เซลล์</TableHead>
-                      <TableHead className="min-w-[100px]">พื้นที่ไหม้</TableHead>
+                      <TableHead className="min-w-[100px]">
+                        พื้นที่ไหม้ (ตร.ม.)
+                      </TableHead>
                       <TableHead className="min-w-[80px]">% ไหม้</TableHead>
                       <TableHead className="min-w-[120px]">ROS (m/s)</TableHead>
                       <TableHead className="min-w-[140px]">วันที่</TableHead>
@@ -305,26 +314,43 @@ export default function SimulationStatistics() {
                         <TableCell className="text-xs">
                           {row.lat.toFixed(4)}, {row.lon.toFixed(4)}
                         </TableCell>
-                        <TableCell>{row.grid_x}×{row.grid_y}</TableCell>
+                        <TableCell>
+                          {row.grid_x}×{row.grid_y}
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-xs">
                             {row.burned_cells}/{row.total_cells}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">{row.burned_area_ha.toFixed(2)}</span>
-                          <span className="text-muted-foreground text-xs ml-1">ha</span>
+                          <span className="font-medium">
+                            {formatAreaValue(row.burned_area_m2)}
+                          </span>
+                          <span className="text-muted-foreground text-xs ml-1">
+                            ตร.ม.
+                          </span>
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            variant={row.burn_percentage > 30 ? "destructive" : row.burn_percentage > 10 ? "secondary" : "outline"}
+                          <Badge
+                            variant={
+                              row.burn_percentage > 30
+                                ? "destructive"
+                                : row.burn_percentage > 10
+                                  ? "secondary"
+                                  : "outline"
+                            }
                           >
                             {row.burn_percentage.toFixed(1)}%
                           </Badge>
                         </TableCell>
                         <TableCell className="text-xs">
-                          <span className="text-muted-foreground">min:</span> {row.ros_min.toFixed(3)}<br/>
-                          <span className="text-muted-foreground">max:</span> {row.ros_max.toFixed(3)}
+                          <span className="text-muted-foreground">min:</span>{" "}
+                          {row.ros_min.toFixed(3)}
+                          <br />
+                          <span className="text-muted-foreground">
+                            max:
+                          </span>{" "}
+                          {row.ros_max.toFixed(3)}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {new Date(row.created_at).toLocaleString("th-TH")}

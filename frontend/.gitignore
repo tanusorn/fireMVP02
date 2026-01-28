@@ -1,4 +1,6 @@
+# =========================
 # Logs
+# =========================
 logs
 *.log
 npm-debug.log*
@@ -7,36 +9,61 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# =========================
+# Node / Frontend build
+# =========================
+node_modules/
+dist/
+dist-ssr/
 *.local
 
-# Editor directories and files
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+# Environment variables (IMPORTANT)
+# =========================
+.env
+frontend/.env
+backend/.env
+
+# =========================
+# Credentials / Secrets
+# =========================
+backend/credentials/earthengine-sa.json
+
+# =========================
+# Docker (ignore all docker-related files)
+# =========================
+Dockerfile
+docker-compose.yml
+
+frontend/Dockerfile
+frontend/docker-compose.yml
+
+backend/Dockerfile
+backend/docker-compose.yml
+
+# =========================
+# Editor / IDE
+# =========================
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-
-# Ignore all .env files everywhere
-.env
-
-# Or explicitly (เผื่อบางระบบ)
-frontend/.env
-backend/.env
-
-# Python cache
-__pycache__/
-*.pyc
-
-# Node
-node_modules/
-
-# VS Code
-.vscode/
+# =========================
+# OS / Misc
+# =========================
+.DS_Store

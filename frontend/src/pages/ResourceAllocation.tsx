@@ -66,6 +66,11 @@ interface StaffData {
   total: number;
 }
 
+interface CenterData {
+  staffCount: number;
+  travelTimeMin: number;
+}
+
 export default function ResourceAllocation() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -90,6 +95,10 @@ export default function ResourceAllocation() {
     available: 0,
     total: 0,
   });
+  const [centerData, setCenterData] = useState<CenterData>({
+    staffCount: 0,
+    travelTimeMin: 30,
+  });
 
   useEffect(() => {
     if (!state) {
@@ -111,6 +120,20 @@ export default function ResourceAllocation() {
   const loadCenterData = async (center: string) => {
     setIsLoading(true);
     try {
+      // Fetch operation center data (staff_count, travel_time_min) from database
+      const { data: centerInfo } = await supabase
+        .from("operation_centers")
+        .select("staff_count, travel_time_min")
+        .eq("code", center)
+        .maybeSingle();
+
+      if (centerInfo) {
+        setCenterData({
+          staffCount: centerInfo.staff_count,
+          travelTimeMin: centerInfo.travel_time_min,
+        });
+      }
+
       const { data: equipmentData } = await supabase
         .from("equipment")
         .select("*")
@@ -148,16 +171,46 @@ export default function ResourceAllocation() {
   };
 
   const handleOptimize = async () => {
-    if (!state) return;
+    if (!selectedCenter) {
+      toast({
+        title: "Select a center",
+        description: "Please select an operation center",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsOptimizing(true);
     try {
-      // 🔥 backend รับเฉพาะ zones
-      const zones: Record<string, number> = {
-        [state.zone]: state.firebreakArea, // ใช้ firebreak area
-      };
+      const centers: ResourceCenter[] = [
+        {
+          id: selectedCenter,
+          name: selectedCenter,
+          staff_count: centerData.staffCount,
+          travel_time_min: centerData.travelTimeMin,
+          equipment: equipment,
+        },
+      ];
 
-      const response = await runOptimization(zones);
+      // Debug: Log data being sent to Math API
+      console.log("=== Math API Request Debug ===");
+      console.log("Selected Center:", selectedCenter);
+      console.log("Staff Count (from DB):", centerData.staffCount);
+      console.log("Travel Time Min:", centerData.travelTimeMin);
+      console.log("Equipment:", equipment);
+      console.log("Full centers payload:", JSON.stringify(centers, null, 2));
+      console.log(
+        "Expected N_max (TeamSize=7):",
+        Math.floor(centerData.staffCount / 7),
+      );
+      console.log("==============================");
+
+      const response = await runOptimization(centers);
+
+      // Debug: Log response from Math API
+      console.log("=== Math API Response Debug ===");
+      console.log("Response:", JSON.stringify(response, null, 2));
+      console.log("===============================");
 
       setResult(response);
       toast({
@@ -166,11 +219,7 @@ export default function ResourceAllocation() {
       });
     } catch (error) {
       console.error("Optimization error:", error);
-      toast({
-        title: "Optimization failed",
-        description: "Unable to calculate resource allocation",
-        variant: "destructive",
-      });
+      toast({ title: "Optimization failed", variant: "destructive" });
     } finally {
       setIsOptimizing(false);
     }

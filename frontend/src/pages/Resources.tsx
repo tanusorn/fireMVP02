@@ -30,7 +30,8 @@ const EQUIPMENT_LABELS: Record<string, string> = {
 export default function Resources() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { centers: operationCenters, isLoading: centersLoading } = useOperationCenters();
+  const { centers: operationCenters, isLoading: centersLoading } =
+    useOperationCenters();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -53,7 +54,7 @@ export default function Resources() {
           .select("operation_center")
           .eq("id", user.id)
           .single();
-        
+
         if (profile) {
           setUserCenter(profile.operation_center);
         }
@@ -89,7 +90,11 @@ export default function Resources() {
     }
   };
 
-  const updateEquipment = (centerCode: string, type: keyof EquipmentData, value: number) => {
+  const updateEquipment = (
+    centerCode: string,
+    type: keyof EquipmentData,
+    value: number,
+  ) => {
     setEquipment((prev) => ({
       ...prev,
       [centerCode]: { ...prev[centerCode], [type]: value },
@@ -98,28 +103,33 @@ export default function Resources() {
 
   const handleSave = async (centerCode: string) => {
     if (userCenter !== centerCode) {
-      toast({ title: "ไม่มีสิทธิ์เข้าถึง", description: "คุณสามารถแก้ไขได้เฉพาะทรัพยากรของศูนย์ของคุณเท่านั้น", variant: "destructive" });
+      toast({
+        title: "ไม่มีสิทธิ์เข้าถึง",
+        description: "คุณสามารถแก้ไขได้เฉพาะทรัพยากรของศูนย์ของคุณเท่านั้น",
+        variant: "destructive",
+      });
       return;
     }
 
     setIsSaving(true);
     try {
       for (const type of EQUIPMENT_TYPES) {
-        const { error } = await supabase
-          .from("equipment")
-          .upsert(
-            {
-              operation_center: centerCode,
-              equipment_type: type,
-              quantity: equipment[centerCode][type],
-            },
-            { onConflict: "operation_center,equipment_type" }
-          );
+        const { error } = await supabase.from("equipment").upsert(
+          {
+            operation_center: centerCode,
+            equipment_type: type,
+            quantity: equipment[centerCode][type],
+          },
+          { onConflict: "operation_center,equipment_type" },
+        );
 
         if (error) throw error;
       }
 
-      toast({ title: "บันทึกอุปกรณ์สำเร็จ", description: `อัปเดตทรัพยากรของ ${centerCode} เรียบร้อยแล้ว` });
+      toast({
+        title: "บันทึกอุปกรณ์สำเร็จ",
+        description: `อัปเดตทรัพยากรของ ${centerCode} เรียบร้อยแล้ว`,
+      });
       setIsEditing(false);
     } catch (error) {
       console.error("Error saving equipment:", error);
@@ -166,9 +176,17 @@ export default function Resources() {
             const centerCode = center.code;
             const isUserCenter = userCenter === centerCode;
             const canEdit = isUserCenter && isEditing;
-            const centerEquipment = equipment[centerCode] || { knife: 0, rake: 0, blower: 0, torch: 0 };
+            const centerEquipment = equipment[centerCode] || {
+              knife: 0,
+              rake: 0,
+              blower: 0,
+              torch: 0,
+            };
             return (
-              <Card key={centerCode} className={!isUserCenter ? "opacity-75" : ""}>
+              <Card
+                key={centerCode}
+                className={!isUserCenter ? "opacity-75" : ""}
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg flex items-center gap-2">
@@ -201,7 +219,13 @@ export default function Resources() {
                           type="number"
                           min={0}
                           value={centerEquipment[type]}
-                          onChange={(e) => updateEquipment(centerCode, type, parseInt(e.target.value) || 0)}
+                          onChange={(e) =>
+                            updateEquipment(
+                              centerCode,
+                              type,
+                              parseInt(e.target.value) || 0,
+                            )
+                          }
                           disabled={!canEdit}
                           className="h-9"
                         />
@@ -217,7 +241,8 @@ export default function Resources() {
                         className="flex-1"
                         disabled={isSaving}
                       >
-                        <X className="mr-2 h-4 w-4" />ยกเลิก
+                        <X className="mr-2 h-4 w-4" />
+                        ยกเลิก
                       </Button>
                       <Button
                         onClick={() => handleSave(centerCode)}
@@ -225,9 +250,15 @@ export default function Resources() {
                         disabled={isSaving}
                       >
                         {isSaving ? (
-                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังบันทึก...</>
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            กำลังบันทึก...
+                          </>
                         ) : (
-                          <><Save className="mr-2 h-4 w-4" />บันทึก</>
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            บันทึก
+                          </>
                         )}
                       </Button>
                     </div>
@@ -249,22 +280,36 @@ export default function Resources() {
                   <tr className="border-b">
                     <th className="text-left py-2 px-3">ศูนย์</th>
                     {EQUIPMENT_TYPES.map((type) => (
-                      <th key={type} className="text-center py-2 px-3">{EQUIPMENT_LABELS[type]}</th>
+                      <th key={type} className="text-center py-2 px-3">
+                        {EQUIPMENT_LABELS[type]}
+                      </th>
                     ))}
                     <th className="text-center py-2 px-3">รวม</th>
                   </tr>
                 </thead>
                 <tbody>
                   {operationCenters.map((center) => {
-                    const centerEquipment = equipment[center.code] || { knife: 0, rake: 0, blower: 0, torch: 0 };
-                    const total = EQUIPMENT_TYPES.reduce((sum, type) => sum + centerEquipment[type], 0);
+                    const centerEquipment = equipment[center.code] || {
+                      knife: 0,
+                      rake: 0,
+                      blower: 0,
+                      torch: 0,
+                    };
+                    const total = EQUIPMENT_TYPES.reduce(
+                      (sum, type) => sum + centerEquipment[type],
+                      0,
+                    );
                     return (
                       <tr key={center.code} className="border-b last:border-0">
                         <td className="py-2 px-3 font-medium">{center.name}</td>
                         {EQUIPMENT_TYPES.map((type) => (
-                          <td key={type} className="text-center py-2 px-3">{centerEquipment[type]}</td>
+                          <td key={type} className="text-center py-2 px-3">
+                            {centerEquipment[type]}
+                          </td>
                         ))}
-                        <td className="text-center py-2 px-3 font-bold">{total}</td>
+                        <td className="text-center py-2 px-3 font-bold">
+                          {total}
+                        </td>
                       </tr>
                     );
                   })}

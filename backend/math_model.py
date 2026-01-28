@@ -1,38 +1,95 @@
 import gurobipy as gp
 from gurobipy import GRB
+from typing import List, Dict, Any
 
 
-def run_math_model(zones: dict) -> dict:
+def run_math_model(zones: dict, centers: List[Dict[str, Any]] = None) -> dict:
     """
     zones = {
         "A": area_A,
         "B": area_B,
         ...
     }
+    centers = [
+        {
+            "id": "K1",
+            "name": "K1",
+            "staff_count": 21,
+            "travel_time_min": 30,
+            "equipment": {"knife": 10, "rake": 5, ...}
+        },
+        ...
+    ]
     """
 
     # =====================
-    # Sets (Dynamic from UI)
+    # Sets (Dynamic from DB via API)
     # =====================
     I = list(zones.keys())
-    K = ["K1"]
+
+    # Dynamic K from centers parameter (fallback for backward compatibility)
+    if centers and len(centers) > 0:
+        K = [c["id"] for c in centers]
+    else:
+        K = ["K1"]  # Fallback
+
     J = ["knife", "rake", "blower", "torch"]
 
     # =====================
-    # Parameters
+    # Parameters (Dynamic from DB)
     # =====================
     Area = zones
 
-    Staff = {"K1": 21}
+    # Dynamic Staff from centers parameter
+    if centers and len(centers) > 0:
+        Staff = {c["id"]: c.get("staff_count", 0) for c in centers}
+        TravelTime = {
+            (c["id"], i): c.get("travel_time_min", 30) for c in centers for i in I
+        }
+    else:
+        # Fallback for backward compatibility
+        Staff = {"K1": 21}
+        TravelTime = {(k, i): 30 for k in K for i in I}
+
     TeamSize = 7
     P_team = 4000 / 30.0
 
-    TravelTime = {(k, i): 30 for k in K for i in I}
-
+    # Calculate N_max from actual staff counts
     N_max = sum(Staff[k] // TeamSize for k in K)
     T_max = 300
+
+    # =====================
+    # Debug Logging
+    # =====================
+    print("=== Math Model Debug ===")
+    print(f"Centers (K): {K}")
+    print(f"Staff: {Staff}")
+    print(f"TravelTime sample: {list(TravelTime.items())[:3]}")
+    print(f"TeamSize: {TeamSize}")
+    print(f"N_max (total teams available): {N_max}")
+    print(f"Zones: {I}")
+    print(f"Areas: {Area}")
+    print("========================")
+
+    # =====================
+    # Edge Case: No teams available
+    # =====================
+    if N_max == 0:
+        print("WARNING: N_max = 0, no teams can be deployed")
+        return {
+            "zones": {
+                i: {
+                    "do": 0,
+                    "teams": 0,
+                    "time": 0.0,
+                    "unfinished_area": Area[i],
+                }
+                for i in I
+            },
+        }
+
     M_range = range(N_max + 1)
-    M = max(Area.values())
+    M = max(Area.values()) if Area.values() else 0
 
     # =====================
     # Model
@@ -87,7 +144,7 @@ def run_math_model(zones: dict) -> dict:
     model.addConstr(gp.quicksum(do[i] for i in I) <= N_max)
 
     # =====================
-    # Objectives (เหมือนเดิม)
+    # Objectives
     # =====================
 
     # Z1: เวลาเดินทางรวม + เวลาทำงาน
@@ -143,12 +200,17 @@ def run_math_model(zones: dict) -> dict:
         raise RuntimeError("Final optimization failed")
 
     # =====================
+    # Debug: Log results
+    # =====================
+    print("=== Optimization Results ===")
+    for i in I:
+        print(f"Zone {i}: do={int(do[i].X)}, teams={int(n[i].X)}, time={t[i].X:.2f}")
+    print("============================")
+
+    # =====================
     # Result (JSON)
     # =====================
     return {
-        # "Z": round(Z.getValue(), 4),
-        # "Z1_time": round(Z1.getValue(), 2),
-        # "Z2_unfinished_area": round(Z2.getValue(), 2),
         "zones": {
             i: {
                 "do": int(do[i].X),

@@ -4,7 +4,16 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, Wrench, ChevronRight, Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import {
+  Building2,
+  Users,
+  Wrench,
+  ChevronRight,
+  Loader2,
+  Plus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOperationCenters } from "@/hooks/useOperationCenters";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -69,11 +78,15 @@ const initialFormData: CenterFormData = {
 export default function OperationCenters() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { centers: operationCentersList, isLoading: centersLoading, refetch } = useOperationCenters();
+  const {
+    centers: operationCentersList,
+    isLoading: centersLoading,
+    refetch,
+  } = useOperationCenters();
   const { isAdmin, isLoading: roleLoading } = useUserRole();
   const [centerSummaries, setCenterSummaries] = useState<CenterSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Dialog states
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -92,7 +105,7 @@ export default function OperationCenters() {
 
   const fetchCenterData = async () => {
     try {
-      // Fetch public profiles grouped by operation center (security: no email exposed)
+      // Fetch public profiles for available officers count (security: no email exposed)
       const { data: profiles } = await supabase
         .from("public_profiles")
         .select("operation_center, current_status");
@@ -102,14 +115,16 @@ export default function OperationCenters() {
         .from("equipment")
         .select("operation_center, equipment_type, quantity");
 
-      // Fetch full center details
+      // Fetch full center details including staff_count from database
       const { data: centerDetails } = await supabase
         .from("operation_centers")
-        .select("code, name, location, description");
+        .select("code, name, location, description, staff_count");
 
       const summaries: CenterSummary[] = operationCentersList.map((center) => {
-        const centerProfiles = profiles?.filter((p) => p.operation_center === center.code) || [];
-        const centerEquipment = equipment?.filter((e) => e.operation_center === center.code) || [];
+        const centerProfiles =
+          profiles?.filter((p) => p.operation_center === center.code) || [];
+        const centerEquipment =
+          equipment?.filter((e) => e.operation_center === center.code) || [];
         const details = centerDetails?.find((c) => c.code === center.code);
 
         return {
@@ -117,8 +132,11 @@ export default function OperationCenters() {
           name: center.name,
           location: details?.location || undefined,
           description: details?.description || undefined,
-          totalOfficers: centerProfiles.length,
-          availableOfficers: centerProfiles.filter((p) => p.current_status === "available").length,
+          // Use staff_count from database (maintained by trigger)
+          totalOfficers: details?.staff_count ?? 0,
+          availableOfficers: centerProfiles.filter(
+            (p) => p.current_status === "available",
+          ).length,
           equipment: centerEquipment.map((e) => ({
             type: e.equipment_type,
             quantity: e.quantity,
@@ -159,11 +177,22 @@ export default function OperationCenters() {
       refetch();
     } catch (error: unknown) {
       console.error("Error creating center:", error);
-      const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
-      if (errorMessage.includes("permission") || errorMessage.includes("policy")) {
-        toast({ title: "ไม่มีสิทธิ์ดำเนินการ", description: "เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถสร้างศูนย์ได้", variant: "destructive" });
+      const errorMessage =
+        error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
+      if (
+        errorMessage.includes("permission") ||
+        errorMessage.includes("policy")
+      ) {
+        toast({
+          title: "ไม่มีสิทธิ์ดำเนินการ",
+          description: "เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถสร้างศูนย์ได้",
+          variant: "destructive",
+        });
       } else {
-        toast({ title: "เกิดข้อผิดพลาดในการสร้างศูนย์", variant: "destructive" });
+        toast({
+          title: "เกิดข้อผิดพลาดในการสร้างศูนย์",
+          variant: "destructive",
+        });
       }
     } finally {
       setIsSubmitting(false);
@@ -198,11 +227,22 @@ export default function OperationCenters() {
       refetch();
     } catch (error: unknown) {
       console.error("Error updating center:", error);
-      const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
-      if (errorMessage.includes("permission") || errorMessage.includes("policy")) {
-        toast({ title: "ไม่มีสิทธิ์ดำเนินการ", description: "เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถแก้ไขศูนย์ได้", variant: "destructive" });
+      const errorMessage =
+        error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
+      if (
+        errorMessage.includes("permission") ||
+        errorMessage.includes("policy")
+      ) {
+        toast({
+          title: "ไม่มีสิทธิ์ดำเนินการ",
+          description: "เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถแก้ไขศูนย์ได้",
+          variant: "destructive",
+        });
       } else {
-        toast({ title: "เกิดข้อผิดพลาดในการแก้ไขศูนย์", variant: "destructive" });
+        toast({
+          title: "เกิดข้อผิดพลาดในการแก้ไขศูนย์",
+          variant: "destructive",
+        });
       }
     } finally {
       setIsSubmitting(false);
@@ -227,9 +267,17 @@ export default function OperationCenters() {
       refetch();
     } catch (error: unknown) {
       console.error("Error deleting center:", error);
-      const errorMessage = error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
-      if (errorMessage.includes("permission") || errorMessage.includes("policy")) {
-        toast({ title: "ไม่มีสิทธิ์ดำเนินการ", description: "เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถลบศูนย์ได้", variant: "destructive" });
+      const errorMessage =
+        error instanceof Error ? error.message : "เกิดข้อผิดพลาด";
+      if (
+        errorMessage.includes("permission") ||
+        errorMessage.includes("policy")
+      ) {
+        toast({
+          title: "ไม่มีสิทธิ์ดำเนินการ",
+          description: "เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถลบศูนย์ได้",
+          variant: "destructive",
+        });
       } else {
         toast({ title: "เกิดข้อผิดพลาดในการลบศูนย์", variant: "destructive" });
       }
@@ -326,9 +374,15 @@ export default function OperationCenters() {
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{center.totalOfficers} เจ้าหน้าที่</span>
+                    <span className="text-sm">
+                      {center.totalOfficers} เจ้าหน้าที่
+                    </span>
                   </div>
-                  <Badge variant={center.availableOfficers > 0 ? "default" : "secondary"}>
+                  <Badge
+                    variant={
+                      center.availableOfficers > 0 ? "default" : "secondary"
+                    }
+                  >
                     {center.availableOfficers} พร้อมปฏิบัติงาน
                   </Badge>
                 </div>
@@ -341,12 +395,18 @@ export default function OperationCenters() {
                   <div className="flex flex-wrap gap-2">
                     {center.equipment.length > 0 ? (
                       center.equipment.map((eq) => (
-                        <Badge key={eq.type} variant="outline" className="text-xs">
+                        <Badge
+                          key={eq.type}
+                          variant="outline"
+                          className="text-xs"
+                        >
                           {EQUIPMENT_LABELS[eq.type] || eq.type}: {eq.quantity}
                         </Badge>
                       ))
                     ) : (
-                      <span className="text-xs text-muted-foreground">ไม่มีอุปกรณ์</span>
+                      <span className="text-xs text-muted-foreground">
+                        ไม่มีอุปกรณ์
+                      </span>
                     )}
                   </div>
                 </div>
@@ -371,7 +431,9 @@ export default function OperationCenters() {
               <Input
                 id="code"
                 value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, code: e.target.value })
+                }
                 placeholder="เช่น K4"
               />
             </div>
@@ -380,7 +442,9 @@ export default function OperationCenters() {
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="ศูนย์ปฏิบัติการ K4"
               />
             </div>
@@ -389,7 +453,9 @@ export default function OperationCenters() {
               <Input
                 id="location"
                 value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, location: e.target.value })
+                }
                 placeholder="ที่อยู่หรือตำแหน่ง"
               />
             </div>
@@ -401,7 +467,9 @@ export default function OperationCenters() {
                   type="number"
                   step="any"
                   value={formData.latitude}
-                  onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, latitude: e.target.value })
+                  }
                   placeholder="0.0"
                 />
               </div>
@@ -412,7 +480,9 @@ export default function OperationCenters() {
                   type="number"
                   step="any"
                   value={formData.longitude}
-                  onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, longitude: e.target.value })
+                  }
                   placeholder="0.0"
                 />
               </div>
@@ -422,17 +492,24 @@ export default function OperationCenters() {
               <Textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 placeholder="รายละเอียดเพิ่มเติม..."
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateDialogOpen(false)}
+            >
               ยกเลิก
             </Button>
             <Button onClick={handleCreate} disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               สร้าง
             </Button>
           </DialogFooter>
@@ -454,7 +531,9 @@ export default function OperationCenters() {
               <Input
                 id="edit-name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2">
@@ -462,7 +541,9 @@ export default function OperationCenters() {
               <Input
                 id="edit-location"
                 value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, location: e.target.value })
+                }
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -473,7 +554,9 @@ export default function OperationCenters() {
                   type="number"
                   step="any"
                   value={formData.latitude}
-                  onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, latitude: e.target.value })
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -483,7 +566,9 @@ export default function OperationCenters() {
                   type="number"
                   step="any"
                   value={formData.longitude}
-                  onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, longitude: e.target.value })
+                  }
                 />
               </div>
             </div>
@@ -492,16 +577,23 @@ export default function OperationCenters() {
               <Textarea
                 id="edit-description"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+            >
               ยกเลิก
             </Button>
             <Button onClick={handleEdit} disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               บันทึก
             </Button>
           </DialogFooter>
@@ -509,12 +601,16 @@ export default function OperationCenters() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>ยืนยันการลบศูนย์ปฏิบัติการ</AlertDialogTitle>
             <AlertDialogDescription>
-              คุณแน่ใจหรือไม่ที่จะลบศูนย์ปฏิบัติการ {selectedCenter}? การดำเนินการนี้ไม่สามารถยกเลิกได้
+              คุณแน่ใจหรือไม่ที่จะลบศูนย์ปฏิบัติการ {selectedCenter}?
+              การดำเนินการนี้ไม่สามารถยกเลิกได้
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -524,7 +620,9 @@ export default function OperationCenters() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
               ลบ
             </AlertDialogAction>
           </AlertDialogFooter>

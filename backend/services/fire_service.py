@@ -1,11 +1,6 @@
+import numpy as np
 from fire_simulator import IntegratedRothermelFireSimulator, FIREBREAK
 from services.wind_service import fetch_wind_from_api_for_date, fuzzy_wind
-
-
-from fire_simulator import (
-    IntegratedRothermelFireSimulator,
-    FIREBREAK,
-)
 
 UNBURNED = 0
 BURNING = 1
@@ -24,6 +19,7 @@ def run_fire_model(cfg: dict) -> dict:
 
     wind_speed = fuzzy_wind(wind_min, wind_max)
 
+    # 🔥 Initialize simulator
     sim = IntegratedRothermelFireSimulator(
         lat=cfg["lat"],
         lon=cfg["lon"],
@@ -36,6 +32,7 @@ def run_fire_model(cfg: dict) -> dict:
         sim_minutes=cfg["sim_minutes"],
     )
 
+    # ▶️ Run simulation
     sim.run_simulation(show_progress=False)
     sim.mark_firebreak(width_m=8.0)
 
@@ -53,28 +50,32 @@ def run_fire_model(cfg: dict) -> dict:
     cell_area = sim.cell_size**2
 
     summary = {
-        "unburned": {
-            #"cells": unburned_cells,
-            "area_m2": unburned_cells * cell_area,
-        },
-        "burning": {
-            #"cells": burning_cells,
-            "area_m2": burning_cells * cell_area,
-        },
-        "burned": {
-            #"cells": burned_cells,
-            "area_m2": burned_cells * cell_area,
-        },
-        "firebreak": {
-            #"cells": firebreak_cells,
-            "area_m2": firebreak_cells * cell_area,
-        },
+        "unburned": {"area_m2": unburned_cells * cell_area},
+        "burning": {"area_m2": burning_cells * cell_area},
+        "burned": {"area_m2": burned_cells * cell_area},
+        "firebreak": {"area_m2": firebreak_cells * cell_area},
     }
 
+    # =========================
+    # 🔥 ROS Statistics (m/s)
+    # =========================
+    ros_grid = sim.ros_grid
+
+    # ตัด NaN และ ROS = 0 (พื้นที่ไม่มีเชื้อเพลิง)
+    valid_ros = ros_grid[(~np.isnan(ros_grid)) & (ros_grid > 0)]
+
+    ros_stats = {
+        "mean_mps": round(float(np.mean(valid_ros)), 4) if valid_ros.size > 0 else 0.0,
+        "min_mps": round(float(np.min(valid_ros)), 4) if valid_ros.size > 0 else 0.0,
+        "max_mps": round(float(np.max(valid_ros)), 4) if valid_ros.size > 0 else 0.0,
+    }
+
+    # =========================
+    # 📤 Final output
+    # =========================
     return {
         "wind_speed": round(wind_speed, 3),
         "wind_direction": round(wind_dir, 1),
-        #"cell_size_m": sim.cell_size,
-        #"cell_area_m2": cell_area,
+        "ros": ros_stats,
         "summary": summary,
     }

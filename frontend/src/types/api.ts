@@ -42,6 +42,7 @@ export interface ResourceCenter {
   id: string;
   name: string;
   staff_count: number;
+  travel_time_min: number;
   equipment: {
     knife: number;
     rake: number;
