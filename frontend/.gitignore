@@ -29,9 +29,6 @@ __pycache__/
 # Environment variables (IMPORTANT)
 # =========================
 .env
-.env.local
-.env.production
-.env.*
 frontend/.env
 backend/.env
 
@@ -41,21 +38,25 @@ backend/.env
 backend/credentials/earthengine-sa.json
 
 # =========================
-# Docker
+# Docker (ignore all docker-related files)
 # =========================
 Dockerfile
 docker-compose.yml
+
 frontend/Dockerfile
 frontend/docker-compose.yml
+
 backend/Dockerfile
 backend/docker-compose.yml
 
 # =========================
 # Editor / IDE
 # =========================
-.vscode/
+.vscode/*
 !.vscode/extensions.json
-.idea/
+.idea
+.DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
@@ -66,4 +67,3 @@ backend/docker-compose.yml
 # OS / Misc
 # =========================
 .DS_Store
-Thumbs.db
