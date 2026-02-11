@@ -8,6 +8,7 @@ router = APIRouter(prefix="/math", tags=["Math Optimization"])
 
 class OptimizeRequest(BaseModel):
     zones: Dict[str, float]  # {"A": 2400, "B": 1800}
+    centers: list = None 
 
 
 @router.post("/optimize")
@@ -16,7 +17,7 @@ def optimize_firebreak(payload: OptimizeRequest):
     รับ zones จาก frontend โดยตรง
     """
     try:
-        result = optimize_from_frontend(payload.zones)
+        result = optimize_from_frontend(payload.zones, payload.centers)
         return {
             "status": "success",
             "result": result,

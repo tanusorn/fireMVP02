@@ -6,31 +6,32 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 // Get auth headers with session token
 async function getAuthHeaders(): Promise<HeadersInit> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
   return {
     "Content-Type": "application/json",
-    ...(session?.access_token
-      ? { Authorization: `Bearer ${session.access_token}` }
-      : {}),
+    ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
   };
 }
 
 // Run resource optimization
 export async function runOptimization(
-  centers?: ResourceCenter[],
+  zones: Record<string, number>,
+  centers?: ResourceCenter[]
 ): Promise<OptimizationResult> {
   const headers = await getAuthHeaders();
+  const payload: Record<string, unknown> = { zones };
+  if (centers && centers.length > 0) {
+    payload.centers = centers;
+  }
   const response = await fetch(`${API_BASE_URL}/math/optimize`, {
     method: "POST",
     headers,
-    body: centers ? JSON.stringify({ centers }) : undefined,
+    body: JSON.stringify(payload),
   });
-
+  
   if (!response.ok) {
     throw new Error(`Optimization failed: ${response.statusText}`);
   }
-
+  
   return response.json();
 }

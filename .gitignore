@@ -1,4 +1,6 @@
+# ======================
 # Logs
+# ======================
 logs
 *.log
 npm-debug.log*
@@ -7,12 +9,17 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
+# ======================
+# Build outputs
+# ======================
+node_modules/
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# ======================
+# Editor / OS
+# ======================
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -23,20 +30,30 @@ dist-ssr
 *.sln
 *.sw?
 
-
-# Ignore all .env files everywhere
+# ======================
+# Environment variables
+# ======================
 .env
-
-# Or explicitly (เผื่อบางระบบ)
 frontend/.env
 backend/.env
 
-# Python cache
+# ======================
+# Secrets (CRITICAL)
+# ======================
+backend/credentials/*
+backend/secrets/*
+!backend/credentials/.gitkeep
+!backend/secrets/.gitkeep
+
+# ======================
+# Python
+# ======================
 __pycache__/
 *.pyc
 
-# Node
-node_modules/
+# ======================
+# Docker
+# ======================
+docker-compose.yml
+**/Dockerfile
 
-# VS Code
-.vscode/

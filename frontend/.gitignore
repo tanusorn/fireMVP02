@@ -67,3 +67,10 @@ Thumbs.db
 # OS / Misc
 # =========================
 .DS_Store
+
+.env
+.env.local
+.env.production
+.env.*
+node_modules
+dist

@@ -1,5 +1,4 @@
-import gurobipy as gp
-from gurobipy import GRB
+from pyomo.environ import *
 from typing import List, Dict, Any
 
 
@@ -23,59 +22,34 @@ def run_math_model(zones: dict, centers: List[Dict[str, Any]] = None) -> dict:
     """
 
     # =====================
-    # Sets (Dynamic from DB via API)
+    # Sets
     # =====================
     I = list(zones.keys())
 
-    # Dynamic K from centers parameter (fallback for backward compatibility)
     if centers and len(centers) > 0:
         K = [c["id"] for c in centers]
     else:
-        K = ["K1"]  # Fallback
+        K = ["K1"]
 
-    J = ["knife", "rake", "blower", "torch"]
-
-    # =====================
-    # Parameters (Dynamic from DB)
-    # =====================
     Area = zones
 
-    # Dynamic Staff from centers parameter
     if centers and len(centers) > 0:
         Staff = {c["id"]: c.get("staff_count", 0) for c in centers}
         TravelTime = {
             (c["id"], i): c.get("travel_time_min", 30) for c in centers for i in I
         }
     else:
-        # Fallback for backward compatibility
         Staff = {"K1": 21}
         TravelTime = {(k, i): 30 for k in K for i in I}
 
     TeamSize = 7
     P_team = 4000 / 30.0
 
-    # Calculate N_max from actual staff counts
     N_max = sum(Staff[k] // TeamSize for k in K)
     T_max = 300
+    M = max(Area.values()) if Area else 0
 
-    # =====================
-    # Debug Logging
-    # =====================
-    print("=== Math Model Debug ===")
-    print(f"Centers (K): {K}")
-    print(f"Staff: {Staff}")
-    print(f"TravelTime sample: {list(TravelTime.items())[:3]}")
-    print(f"TeamSize: {TeamSize}")
-    print(f"N_max (total teams available): {N_max}")
-    print(f"Zones: {I}")
-    print(f"Areas: {Area}")
-    print("========================")
-
-    # =====================
-    # Edge Case: No teams available
-    # =====================
     if N_max == 0:
-        print("WARNING: N_max = 0, no teams can be deployed")
         return {
             "zones": {
                 i: {
@@ -85,139 +59,165 @@ def run_math_model(zones: dict, centers: List[Dict[str, Any]] = None) -> dict:
                     "unfinished_area": Area[i],
                 }
                 for i in I
-            },
+            }
         }
 
     M_range = range(N_max + 1)
-    M = max(Area.values()) if Area.values() else 0
 
     # =====================
     # Model
     # =====================
-    model = gp.Model("Firebreak_MultiObjective_API")
-    model.setParam("OutputFlag", 0)
+    model = ConcreteModel()
+
+    model.I = Set(initialize=I)
+    model.K = Set(initialize=K)
+    model.M = Set(initialize=M_range)
 
     # =====================
     # Variables
     # =====================
-    x = model.addVars(I, K, vtype=GRB.INTEGER, lb=0)
-    y = model.addVars(I, K, vtype=GRB.BINARY)
-    n = model.addVars(I, vtype=GRB.INTEGER, lb=0, ub=N_max)
-    t = model.addVars(I, vtype=GRB.CONTINUOUS, lb=0, ub=T_max)
-    A_uncomp = model.addVars(I, vtype=GRB.CONTINUOUS, lb=0)
-    do = model.addVars(I, vtype=GRB.BINARY)
+    model.x = Var(model.I, model.K, domain=NonNegativeIntegers)
+    model.y = Var(model.I, model.K, domain=Binary)
+    model.n = Var(model.I, domain=NonNegativeIntegers, bounds=(0, N_max))
+    model.t = Var(model.I, domain=NonNegativeReals, bounds=(0, T_max))
+    model.A_uncomp = Var(model.I, domain=NonNegativeReals)
+    model.do = Var(model.I, domain=Binary)
 
-    d = model.addVars(I, M_range, vtype=GRB.BINARY)
-    tau = model.addVars(I, M_range, vtype=GRB.CONTINUOUS, lb=0)
-    z = model.addVars(I, vtype=GRB.CONTINUOUS, lb=0)
+    model.d = Var(model.I, model.M, domain=Binary)
+    model.tau = Var(model.I, model.M, domain=NonNegativeReals, bounds=(0, T_max))
+    model.z = Var(model.I, domain=NonNegativeReals)
 
     # =====================
     # Constraints
     # =====================
-    for i in I:
-        model.addConstr(n[i] == gp.quicksum(x[i, k] for k in K))
-        model.addConstr(n[i] >= do[i])
-        model.addConstr(n[i] <= N_max * do[i])
-        model.addConstr(t[i] <= T_max * do[i])
+    def team_sum_rule(m, i):
+        return m.n[i] == sum(m.x[i, k] for k in m.K)
 
-        model.addConstr(A_uncomp[i] <= M * (1 - do[i]))
-        model.addConstr(A_uncomp[i] >= Area[i] * (1 - do[i]))
+    model.team_sum = Constraint(model.I, rule=team_sum_rule)
 
-        model.addConstr(gp.quicksum(d[i, m] for m in M_range) == 1)
-        model.addConstr(n[i] == gp.quicksum(m * d[i, m] for m in M_range))
+    def do_lower_rule(m, i):
+        return m.n[i] >= m.do[i]
 
-        for m in M_range:
-            model.addConstr(tau[i, m] <= T_max * d[i, m])
-            model.addConstr(tau[i, m] <= t[i])
-            model.addConstr(tau[i, m] >= t[i] - T_max * (1 - d[i, m]))
+    def do_upper_rule(m, i):
+        return m.n[i] <= N_max * m.do[i]
 
-        model.addConstr(t[i] == gp.quicksum(tau[i, m] for m in M_range))
-        model.addConstr(z[i] == gp.quicksum(m * tau[i, m] for m in M_range))
+    def time_do_rule(m, i):
+        return m.t[i] <= T_max * m.do[i]
 
-        model.addConstr(P_team * z[i] + A_uncomp[i] == Area[i])
+    model.do_lower = Constraint(model.I, rule=do_lower_rule)
+    model.do_upper = Constraint(model.I, rule=do_upper_rule)
+    model.time_do = Constraint(model.I, rule=time_do_rule)
 
-        for k in K:
-            model.addConstr(x[i, k] <= N_max * y[i, k])
-            model.addConstr(x[i, k] <= N_max * do[i])
-            model.addConstr(y[i, k] <= do[i])
+    def uncomp_upper_rule(m, i):
+        return m.A_uncomp[i] <= M * (1 - m.do[i])
 
-    model.addConstr(gp.quicksum(do[i] for i in I) <= N_max)
+    def uncomp_lower_rule(m, i):
+        return m.A_uncomp[i] >= Area[i] * (1 - m.do[i])
+
+    model.uncomp_upper = Constraint(model.I, rule=uncomp_upper_rule)
+    model.uncomp_lower = Constraint(model.I, rule=uncomp_lower_rule)
+
+    def d_sum_rule(m, i):
+        return sum(m.d[i, mm] for mm in m.M) == 1
+
+    def n_def_rule(m, i):
+        return m.n[i] == sum(mm * m.d[i, mm] for mm in m.M)
+
+    model.d_sum = Constraint(model.I, rule=d_sum_rule)
+    model.n_def = Constraint(model.I, rule=n_def_rule)
+
+    def tau_upper1(m, i, mm):
+        return m.tau[i, mm] <= T_max * m.d[i, mm]
+
+    def tau_upper2(m, i, mm):
+        return m.tau[i, mm] <= m.t[i]
+
+    def tau_lower(m, i, mm):
+        return m.tau[i, mm] >= m.t[i] - T_max * (1 - m.d[i, mm])
+
+    model.tau_u1 = Constraint(model.I, model.M, rule=tau_upper1)
+    model.tau_u2 = Constraint(model.I, model.M, rule=tau_upper2)
+    model.tau_l = Constraint(model.I, model.M, rule=tau_lower)
+
+    def t_def_rule(m, i):
+        return m.t[i] == sum(m.tau[i, mm] for mm in m.M)
+
+    def z_def_rule(m, i):
+        return m.z[i] == sum(mm * m.tau[i, mm] for mm in m.M)
+
+    model.t_def = Constraint(model.I, rule=t_def_rule)
+    model.z_def = Constraint(model.I, rule=z_def_rule)
+
+    def area_balance_rule(m, i):
+        return P_team * m.z[i] + m.A_uncomp[i] == Area[i]
+
+    model.area_balance = Constraint(model.I, rule=area_balance_rule)
+
+    def link_x_y_rule(m, i, k):
+        return m.x[i, k] <= N_max * m.y[i, k]
+
+    def link_x_do_rule(m, i, k):
+        return m.x[i, k] <= N_max * m.do[i]
+
+    def link_y_do_rule(m, i, k):
+        return m.y[i, k] <= m.do[i]
+
+    model.link_x_y = Constraint(model.I, model.K, rule=link_x_y_rule)
+    model.link_x_do = Constraint(model.I, model.K, rule=link_x_do_rule)
+    model.link_y_do = Constraint(model.I, model.K, rule=link_y_do_rule)
+
+    def total_do_rule(m):
+        return sum(m.do[i] for i in m.I) <= N_max
+
+    model.total_do = Constraint(rule=total_do_rule)
 
     # =====================
     # Objectives
     # =====================
-
-    # Z1: เวลาเดินทางรวม + เวลาทำงาน
-    Z1 = gp.quicksum(TravelTime[(k, i)] * y[i, k] for i in I for k in K) + gp.quicksum(
-        t[i] for i in I
+    model.Z1 = Expression(
+        expr=sum(TravelTime[(k, i)] * model.y[i, k] for i in I for k in K)
+        + sum(model.t[i] for i in I)
     )
 
-    # Z2: พื้นที่แนวกันไฟที่ยังไม่เสร็จ
-    Z2 = gp.quicksum(A_uncomp[i] for i in I)
+    model.Z2 = Expression(expr=sum(model.A_uncomp[i] for i in I))
 
-    # =====================
-    # Step 1: Minimize Z1
-    # =====================
-    model.setObjective(Z1, GRB.MINIMIZE)
-    model.optimize()
+    solver = SolverFactory("highs")
 
-    if model.status != GRB.OPTIMAL:
-        raise RuntimeError("Step 1 optimization failed")
+    # Step 1: Min Z1
+    model.obj1 = Objective(expr=model.Z1, sense=minimize)
+    solver.solve(model)
+    Z1_opt = value(model.Z1)
+    Z2_at_Z1 = value(model.Z2)
+    model.obj1.deactivate()
 
-    Z1_opt = Z1.getValue()
-    Z2_at_Z1 = Z2.getValue()
+    # Step 2: Min Z2
+    model.obj2 = Objective(expr=model.Z2, sense=minimize)
+    solver.solve(model)
+    Z2_opt = value(model.Z2)
+    Z1_at_Z2 = value(model.Z1)
+    model.obj2.deactivate()
 
-    # =====================
-    # Step 2: Minimize Z2
-    # =====================
-    model.setObjective(Z2, GRB.MINIMIZE)
-    model.optimize()
-
-    if model.status != GRB.OPTIMAL:
-        raise RuntimeError("Step 2 optimization failed")
-
-    Z2_opt = Z2.getValue()
-    Z1_at_Z2 = Z1.getValue()
-
-    # =====================
-    # Step 3: Weighted Normalized
-    # =====================
-    Z1U, Z1N = Z1_opt, Z1_at_Z2
-    Z2U, Z2N = Z2_opt, Z2_at_Z1
-
-    # ป้องกันหาร 0
+    # Step 3: Weighted normalized
     eps = 1e-6
+    model.Z = Expression(
+        expr=0.5 * (model.Z1 - Z1_opt) / (Z1_at_Z2 - Z1_opt + eps)
+        + 0.5 * (model.Z2 - Z2_opt) / (Z2_at_Z1 - Z2_opt + eps)
+    )
 
-    UZ1 = (Z1 - Z1U) / (Z1N - Z1U + eps)
-    UZ2 = (Z2 - Z2U) / (Z2N - Z2U + eps)
-
-    Z = 0.5 * UZ1 + 0.5 * UZ2
-
-    model.setObjective(Z, GRB.MINIMIZE)
-    model.optimize()
-
-    if model.status != GRB.OPTIMAL:
-        raise RuntimeError("Final optimization failed")
+    model.obj = Objective(expr=model.Z, sense=minimize)
+    solver.solve(model)
 
     # =====================
-    # Debug: Log results
-    # =====================
-    print("=== Optimization Results ===")
-    for i in I:
-        print(f"Zone {i}: do={int(do[i].X)}, teams={int(n[i].X)}, time={t[i].X:.2f}")
-    print("============================")
-
-    # =====================
-    # Result (JSON)
+    # Result
     # =====================
     return {
         "zones": {
             i: {
-                "do": int(do[i].X),
-                "teams": int(n[i].X),
-                "time": round(t[i].X, 2),
-                "unfinished_area": round(A_uncomp[i].X, 2),
+                "do": int(value(model.do[i])),
+                "teams": int(value(model.n[i])),
+                "time": round(value(model.t[i]), 2),
+                "unfinished_area": round(value(model.A_uncomp[i]), 2),
             }
             for i in I
-        },
+        }
     }

@@ -4,24 +4,9 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import {
-  Calculator,
-  Loader2,
-  Users,
-  Check,
-  X,
-  Package,
-  ArrowLeft,
-  Plus,
-} from "lucide-react";
+import { Calculator, Loader2, Users, Check, X, Package, ArrowLeft, Plus } from "lucide-react";
 import { runOptimization } from "@/api/math";
 import { OptimizationResult, ZoneType, ResourceCenter } from "@/types/api";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,28 +70,13 @@ export default function ResourceAllocation() {
   const [isSaving, setIsSaving] = useState(false);
   const [allocationSaved, setAllocationSaved] = useState(false);
   const [result, setResult] = useState<OptimizationResult | null>(null);
-  const [equipment, setEquipment] = useState<EquipmentData>({
-    knife: 0,
-    rake: 0,
-    blower: 0,
-    torch: 0,
-  });
-  const [staffData, setStaffData] = useState<StaffData>({
-    available: 0,
-    total: 0,
-  });
-  const [centerData, setCenterData] = useState<CenterData>({
-    staffCount: 0,
-    travelTimeMin: 30,
-  });
+  const [equipment, setEquipment] = useState<EquipmentData>({ knife: 0, rake: 0, blower: 0, torch: 0 });
+  const [staffData, setStaffData] = useState<StaffData>({ available: 0, total: 0 });
+  const [centerData, setCenterData] = useState<CenterData>({ staffCount: 0, travelTimeMin: 30 });
 
   useEffect(() => {
     if (!state) {
-      toast({
-        title: "No data",
-        description: "Please start from fire simulation",
-        variant: "destructive",
-      });
+      toast({ title: "No data", description: "Please start from fire simulation", variant: "destructive" });
       navigate("/fire-simulation");
     }
   }, [state, navigate, toast]);
@@ -139,12 +109,7 @@ export default function ResourceAllocation() {
         .select("*")
         .eq("operation_center", center);
 
-      const newEquipment: EquipmentData = {
-        knife: 0,
-        rake: 0,
-        blower: 0,
-        torch: 0,
-      };
+      const newEquipment: EquipmentData = { knife: 0, rake: 0, blower: 0, torch: 0 };
       equipmentData?.forEach((item) => {
         const type = item.equipment_type as keyof EquipmentData;
         if (["knife", "rake", "blower", "torch"].includes(type)) {
@@ -159,8 +124,7 @@ export default function ResourceAllocation() {
         .eq("operation_center", center);
 
       const total = profiles?.length || 0;
-      const available =
-        profiles?.filter((p) => p.current_status === "available").length || 0;
+      const available = profiles?.filter((p) => p.current_status === "available").length || 0;
       setStaffData({ available, total });
     } catch (error) {
       console.error("Error loading center data:", error);
@@ -172,51 +136,55 @@ export default function ResourceAllocation() {
 
   const handleOptimize = async () => {
     if (!selectedCenter) {
-      toast({
-        title: "Select a center",
-        description: "Please select an operation center",
-        variant: "destructive",
-      });
+      toast({ title: "Select a center", description: "Please select an operation center", variant: "destructive" });
       return;
     }
 
     setIsOptimizing(true);
     try {
-      const centers: ResourceCenter[] = [
-        {
-          id: selectedCenter,
-          name: selectedCenter,
-          staff_count: centerData.staffCount,
-          travel_time_min: centerData.travelTimeMin,
-          equipment: equipment,
-        },
-      ];
+      // Build zones dict from report_zones table
+      const { data: reportZones, error: zonesError } = await supabase
+        .from("report_zones")
+        .select("zone_name, firebreak_area_m2")
+        .eq("report_id", state!.reportId);
 
-      // Debug: Log data being sent to Math API
+      if (zonesError) throw zonesError;
+
+      const zones: Record<string, number> = {};
+      reportZones?.forEach((rz) => {
+        if (rz.firebreak_area_m2 > 0) {
+          zones[rz.zone_name] = rz.firebreak_area_m2;
+        }
+      });
+
+      if (Object.keys(zones).length === 0) {
+        toast({ title: "No zone data", description: "No zones with firebreak area found", variant: "destructive" });
+        setIsOptimizing(false);
+        return;
+      }
+
+      const centers: ResourceCenter[] = [{
+        id: selectedCenter,
+        name: selectedCenter,
+        staff_count: centerData.staffCount,
+        travel_time_min: centerData.travelTimeMin,
+        equipment: equipment,
+      }];
+
       console.log("=== Math API Request Debug ===");
-      console.log("Selected Center:", selectedCenter);
-      console.log("Staff Count (from DB):", centerData.staffCount);
-      console.log("Travel Time Min:", centerData.travelTimeMin);
-      console.log("Equipment:", equipment);
-      console.log("Full centers payload:", JSON.stringify(centers, null, 2));
-      console.log(
-        "Expected N_max (TeamSize=7):",
-        Math.floor(centerData.staffCount / 7),
-      );
+      console.log("Zones payload:", JSON.stringify(zones, null, 2));
+      console.log("Centers payload:", JSON.stringify(centers, null, 2));
+      console.log("Expected N_max (TeamSize=7):", Math.floor(centerData.staffCount / 7));
       console.log("==============================");
 
-      const response = await runOptimization(centers);
-
-      // Debug: Log response from Math API
+      const response = await runOptimization(zones, centers);
+      
       console.log("=== Math API Response Debug ===");
       console.log("Response:", JSON.stringify(response, null, 2));
       console.log("===============================");
-
+      
       setResult(response);
-      toast({
-        title: "Optimization complete",
-        description: "Resource allocation calculated",
-      });
+      toast({ title: "Optimization complete", description: "Resource allocation calculated" });
     } catch (error) {
       console.error("Optimization error:", error);
       toast({ title: "Optimization failed", variant: "destructive" });
@@ -250,18 +218,9 @@ export default function ResourceAllocation() {
 
       // Create incident record
       const simResult = state.simulationResult;
-      const totalArea =
-        simResult.summary.unburned.area_m2 +
-        simResult.summary.burning.area_m2 +
-        simResult.summary.burned.area_m2 +
-        simResult.summary.firebreak.area_m2;
-      const burnPercentage =
-        totalArea > 0
-          ? ((simResult.summary.burned.area_m2 +
-              simResult.summary.burning.area_m2) /
-              totalArea) *
-            100
-          : 0;
+      const totalArea = simResult.summary.unburned.area_m2 + simResult.summary.burning.area_m2 + 
+                        simResult.summary.burned.area_m2 + simResult.summary.firebreak.area_m2;
+      const burnPercentage = totalArea > 0 ? ((simResult.summary.burned.area_m2 + simResult.summary.burning.area_m2) / totalArea) * 100 : 0;
 
       await createIncident({
         zone: state.zone,
@@ -269,8 +228,7 @@ export default function ResourceAllocation() {
         lon: state.lon || 0,
         severity: calculateSeverity(burnPercentage, 1),
         status: "active",
-        fire_status:
-          simResult.summary.burning.area_m2 > 0 ? "burning" : "contained",
+        fire_status: simResult.summary.burning.area_m2 > 0 ? "burning" : "contained",
         cell_status: {
           unburned_area_m2: simResult.summary.unburned.area_m2,
           burning_area_m2: simResult.summary.burning.area_m2,
@@ -279,31 +237,17 @@ export default function ResourceAllocation() {
         },
         ros_statistics: { min: 0, max: 0, avg: 0 },
         starting_point: { lat: state.lat || 0, lon: state.lon || 0 },
-        wind_info: {
-          speed_mps: simResult.wind_speed,
-          direction_deg: simResult.wind_direction,
-        },
-        simulation_params: JSON.parse(
-          JSON.stringify(state.simulationParams || {}),
-        ),
+        wind_info: { speed_mps: simResult.wind_speed, direction_deg: simResult.wind_direction },
+        simulation_params: JSON.parse(JSON.stringify(state.simulationParams || {})),
         optimization_result: JSON.parse(JSON.stringify(result)),
-        status_history: [
-          {
-            status: "burning",
-            updated_by: user.name || "System",
-            updated_at: new Date().toISOString(),
-          },
-        ],
+        status_history: [{ status: "burning", updated_by: user.name || "System", updated_at: new Date().toISOString() }],
         report_id: state.reportId,
         report_code: state.reportCode,
         created_by: user.id,
       });
 
       setAllocationSaved(true);
-      toast({
-        title: "บันทึกสำเร็จ",
-        description: `บันทึกการจัดสรรทรัพยากรและเหตุการณ์สำหรับ Zone ${state.zone}`,
-      });
+      toast({ title: "บันทึกสำเร็จ", description: `บันทึกการจัดสรรทรัพยากรและเหตุการณ์สำหรับ Zone ${state.zone}` });
     } catch (error) {
       console.error("Save error:", error);
       toast({ title: "Failed to save allocation", variant: "destructive" });
@@ -331,23 +275,13 @@ export default function ResourceAllocation() {
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(-1)}
-              className="mb-2"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+            <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-2">
+              <ArrowLeft className="mr-2 h-4 w-4" />Back
             </Button>
-            <h1 className="text-xl sm:text-2xl font-bold">
-              Resource Allocation
-            </h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Resource Allocation</h1>
             <p className="text-sm text-muted-foreground">{state.reportName}</p>
           </div>
-          <Badge variant="secondary" className="w-fit">
-            {state.reportCode}
-          </Badge>
+          <Badge variant="secondary" className="w-fit">{state.reportCode}</Badge>
         </div>
 
         {/* Zone Info */}
@@ -358,27 +292,19 @@ export default function ResourceAllocation() {
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="text-xl font-bold text-info">
-                  {state.firebreakArea.toLocaleString()}
-                </p>
+                <p className="text-xl font-bold text-info">{state.firebreakArea.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">Firebreak m²</p>
               </div>
               <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="text-xl font-bold text-destructive">
-                  {state.burnedArea.toLocaleString()}
-                </p>
+                <p className="text-xl font-bold text-destructive">{state.burnedArea.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">Burned m²</p>
               </div>
               <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="text-xl font-bold">
-                  {state.simulationResult.wind_speed.toFixed(1)}
-                </p>
+                <p className="text-xl font-bold">{state.simulationResult.wind_speed.toFixed(1)}</p>
                 <p className="text-xs text-muted-foreground">Wind m/s</p>
               </div>
               <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="text-xl font-bold">
-                  {state.simulationResult.wind_direction.toFixed(0)}°
-                </p>
+                <p className="text-xl font-bold">{state.simulationResult.wind_direction.toFixed(0)}°</p>
                 <p className="text-xs text-muted-foreground">Wind Dir</p>
               </div>
             </div>
@@ -393,10 +319,7 @@ export default function ResourceAllocation() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Operation Center</Label>
-              <Select
-                value={selectedCenter}
-                onValueChange={(v) => setSelectedCenter(v)}
-              >
+              <Select value={selectedCenter} onValueChange={(v) => setSelectedCenter(v)}>
                 <SelectTrigger className="w-full sm:w-64">
                   <SelectValue placeholder="Select center..." />
                 </SelectTrigger>
@@ -417,12 +340,8 @@ export default function ResourceAllocation() {
                     <div className="flex items-center gap-3">
                       <Users className="h-8 w-8 text-primary" />
                       <div>
-                        <p className="text-2xl font-bold">
-                          {staffData.available} / {staffData.total}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Available Staff
-                        </p>
+                        <p className="text-2xl font-bold">{staffData.available} / {staffData.total}</p>
+                        <p className="text-xs text-muted-foreground">Available Staff</p>
                       </div>
                     </div>
                   </CardContent>
@@ -435,9 +354,7 @@ export default function ResourceAllocation() {
                         <p className="text-2xl font-bold">
                           {Object.values(equipment).reduce((a, b) => a + b, 0)}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          Total Equipment
-                        </p>
+                        <p className="text-xs text-muted-foreground">Total Equipment</p>
                       </div>
                     </div>
                   </CardContent>
@@ -448,14 +365,9 @@ export default function ResourceAllocation() {
             {selectedCenter && !isLoading && (
               <div className="grid grid-cols-4 gap-2">
                 {(["knife", "rake", "blower", "torch"] as const).map((type) => (
-                  <div
-                    key={type}
-                    className="text-center p-2 bg-muted/50 rounded-lg"
-                  >
+                  <div key={type} className="text-center p-2 bg-muted/50 rounded-lg">
                     <p className="text-lg font-bold">{equipment[type]}</p>
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {type}
-                    </p>
+                    <p className="text-xs text-muted-foreground capitalize">{type}</p>
                   </div>
                 ))}
               </div>
@@ -476,15 +388,9 @@ export default function ResourceAllocation() {
           disabled={!selectedCenter || isOptimizing || isLoading}
         >
           {isOptimizing ? (
-            <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Optimizing...
-            </>
+            <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Optimizing...</>
           ) : (
-            <>
-              <Calculator className="mr-2 h-5 w-5" />
-              Run Optimization
-            </>
+            <><Calculator className="mr-2 h-5 w-5" />Run Optimization</>
           )}
         </Button>
 
@@ -498,56 +404,23 @@ export default function ResourceAllocation() {
                 const isActive = data && data.do === 1;
                 const isCurrentZone = zone === state.zone;
                 return (
-                  <Card
-                    key={zone}
-                    className={cn(
-                      !isActive && "opacity-50",
-                      isCurrentZone && "border-primary",
-                    )}
-                  >
+                  <Card key={zone} className={cn(!isActive && "opacity-50", isCurrentZone && "border-primary")}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <span className="text-xl font-bold">Zone {zone}</span>
-                          {isActive ? (
-                            <Check className="h-5 w-5 text-success" />
-                          ) : (
-                            <X className="h-5 w-5 text-muted-foreground" />
-                          )}
+                          {isActive ? <Check className="h-5 w-5 text-success" /> : <X className="h-5 w-5 text-muted-foreground" />}
                         </div>
                         <div className="flex gap-1">
                           {isCurrentZone && <Badge>Current</Badge>}
-                          <Badge variant={isActive ? "default" : "secondary"}>
-                            {isActive ? "Active" : "Inactive"}
-                          </Badge>
+                          <Badge variant={isActive ? "default" : "secondary"}>{isActive ? "Active" : "Inactive"}</Badge>
                         </div>
                       </div>
                       {data && (
                         <div className="grid grid-cols-3 gap-4 text-center">
-                          <div>
-                            <p className="text-2xl font-bold text-info">
-                              {data.teams}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Teams
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-2xl font-bold text-warning">
-                              {data.time.toFixed(0)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Minutes
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-2xl font-bold text-destructive">
-                              {data.unfinished_area.toLocaleString()}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Unfinished
-                            </p>
-                          </div>
+                          <div><p className="text-2xl font-bold text-info">{data.teams}</p><p className="text-xs text-muted-foreground">Teams</p></div>
+                          <div><p className="text-2xl font-bold text-warning">{data.time.toFixed(0)}</p><p className="text-xs text-muted-foreground">Minutes</p></div>
+                          <div><p className="text-2xl font-bold text-destructive">{data.unfinished_area.toLocaleString()}</p><p className="text-xs text-muted-foreground">Unfinished</p></div>
                         </div>
                       )}
                     </CardContent>
@@ -561,53 +434,28 @@ export default function ResourceAllocation() {
                 <Users className="h-8 w-8 text-primary" />
                 <div>
                   <p className="text-2xl font-bold">
-                    {Object.values(result.result.zones).reduce(
-                      (sum, z) => sum + (z?.teams || 0),
-                      0,
-                    )}{" "}
-                    Teams
+                    {Object.values(result.result.zones).reduce((sum, z) => sum + (z?.teams || 0), 0)} Teams
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    Total deployed across all zones
-                  </p>
+                  <p className="text-sm text-muted-foreground">Total deployed across all zones</p>
                 </div>
               </CardContent>
             </Card>
 
             {!allocationSaved ? (
-              <Button
-                onClick={handleSaveAllocation}
-                className="w-full h-12"
-                disabled={isSaving}
-              >
+              <Button onClick={handleSaveAllocation} className="w-full h-12" disabled={isSaving}>
                 {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
                 ) : (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Save Allocation
-                  </>
+                  <><Check className="mr-2 h-4 w-4" />Save Allocation</>
                 )}
               </Button>
             ) : (
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button
-                  onClick={handleAddZone}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Another Zone
+                <Button onClick={handleAddZone} variant="outline" className="flex-1">
+                  <Plus className="mr-2 h-4 w-4" />Add Another Zone
                 </Button>
-                <Button
-                  onClick={() => navigate("/fire-simulation")}
-                  className="flex-1"
-                >
-                  <Check className="mr-2 h-4 w-4" />
-                  Done
+                <Button onClick={() => navigate("/fire-simulation")} className="flex-1">
+                  <Check className="mr-2 h-4 w-4" />Done
                 </Button>
               </div>
             )}

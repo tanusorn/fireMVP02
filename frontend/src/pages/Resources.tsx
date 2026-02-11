@@ -24,7 +24,7 @@ const EQUIPMENT_LABELS: Record<string, string> = {
   knife: "มีด",
   rake: "คราด",
   blower: "เครื่องเป่า",
-  torch: "ไฟฉาย",
+  torch: "ไฟเเช็ก",
 };
 
 export default function Resources() {
