@@ -1,6 +1,6 @@
-# ======================
+# =========================
 # Logs
-# ======================
+# =========================
 logs
 *.log
 npm-debug.log*
@@ -9,51 +9,62 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# ======================
-# Build outputs
-# ======================
+# =========================
+# Node / Frontend build
+# =========================
 node_modules/
-dist
-dist-ssr
+dist/
+dist-ssr/
 *.local
 
-# ======================
-# Editor / OS
-# ======================
-.vscode/*
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+# Environment variables (IMPORTANT)
+# =========================
+.env
+.env.local
+.env.production
+.env.*
+frontend/.env
+backend/.env
+
+# =========================
+# Credentials / Secrets (CRITICAL)
+# =========================
+backend/credentials/*
+backend/secrets/*
+!backend/credentials/.gitkeep
+!backend/secrets/.gitkeep
+backend/credentials/earthengine-sa.json
+
+# =========================
+# Docker
+# =========================
+docker-compose.yml
+Dockerfile
+**/Dockerfile
+
+# =========================
+# Editor / IDE
+# =========================
+.vscode/
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# ======================
-# Environment variables
-# ======================
-.env
-frontend/.env
-backend/.env
-
-# ======================
-# Secrets (CRITICAL)
-# ======================
-backend/credentials/*
-backend/secrets/*
-!backend/credentials/.gitkeep
-!backend/secrets/.gitkeep
-
-# ======================
-# Python
-# ======================
-__pycache__/
-*.pyc
-
-# ======================
-# Docker
-# ======================
-docker-compose.yml
-**/Dockerfile
-
+# =========================
+# OS / Misc
+# =========================
+.DS_Store
+Thumbs.db
